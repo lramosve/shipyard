@@ -158,8 +158,8 @@ The edit tool has been tested against:
 
 ## Trace Links (MVP)
 
-- Trace 1 (normal run): _(to be added after generating shareable LangSmith link)_
-- Trace 2 (error path): _(to be added after generating shareable LangSmith link)_
+- Trace 1 (normal run — read file + surgical edit): https://smith.langchain.com/public/8c7772fd-b6d6-449b-bf37-80bb78df7b12/r
+- Trace 2 (error/recovery path — search for missing method, discover it's absent, add it, verify with test): https://smith.langchain.com/public/24b479c5-a023-4855-947b-92914f28a0e6/r
 
 ---
 
