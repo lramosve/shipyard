@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from shipyard.tools.base import FileReadTracker, ToolResult
+from shipyard.tools.snapshots import FileSnapshotStore
 
 
 def write_file(
@@ -12,6 +13,7 @@ def write_file(
     content: str,
     *,
     tracker: FileReadTracker,
+    snapshot_store: FileSnapshotStore | None = None,
 ) -> ToolResult:
     """Write content to a file. Creates parent directories if needed.
 
@@ -29,6 +31,11 @@ def write_file(
         )
 
     try:
+        # Snapshot existing content before overwrite
+        if snapshot_store and path.is_file():
+            existing = path.read_text(encoding="utf-8")
+            snapshot_store.save_snapshot(str(path), existing)
+
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         tracker.record_read(str(path))

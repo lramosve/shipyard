@@ -12,9 +12,11 @@ from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
 
 from shipyard.agent.graph import build_agent_graph
+from shipyard.agent.nodes import reset_snapshot_store
 from shipyard.agent.supervisor import build_supervisor_graph
 from shipyard.config import settings
 from shipyard.context.injection import load_context_from_file
+from shipyard.persistence import SessionStore
 from shipyard.tracing.setup import configure_tracing
 
 
@@ -60,13 +62,32 @@ class TaskResponse(BaseModel):
 
 class SessionState:
     def __init__(self):
+        self.session_id = "default"
         self.file_read_tracker: dict[str, float] = {}
         self.injected_context: list[dict] = []
         self.messages: list = []
         self.tasks: dict[str, TaskResponse] = {}
         self.agent = build_agent_graph()
         self.supervisor = build_supervisor_graph()
+        self.store = SessionStore()
         self._lock = asyncio.Lock()
+        # Try to restore previous session
+        self._restore()
+
+    def _restore(self):
+        """Restore session from SQLite if available."""
+        msgs = self.store.load_messages(self.session_id)
+        if msgs:
+            self.messages = msgs
+            self.file_read_tracker = self.store.load_file_tracker(self.session_id)
+            self.injected_context = self.store.load_context(self.session_id)
+
+    def persist(self):
+        """Save current state to SQLite."""
+        self.store.create_session(self.session_id, settings.working_directory)
+        self.store.save_messages(self.session_id, self.messages)
+        self.store.save_file_tracker(self.session_id, self.file_read_tracker)
+        self.store.save_context(self.session_id, self.injected_context)
 
 
 session = SessionState()
@@ -96,6 +117,7 @@ async def process_instruction(task_id: str, request: InstructionRequest):
                 "file_read_tracker": dict(session.file_read_tracker),
                 "injected_context": list(session.injected_context),
                 "working_directory": settings.working_directory,
+                "consecutive_errors": 0,
             }
 
             # Run the appropriate graph
@@ -117,6 +139,9 @@ async def process_instruction(task_id: str, request: InstructionRequest):
 
             session.tasks[task_id].status = TaskStatus.COMPLETED
             session.tasks[task_id].result = final_text
+
+            # Persist to SQLite
+            session.persist()
 
         except Exception as e:
             session.tasks[task_id].status = TaskStatus.FAILED
@@ -205,6 +230,8 @@ async def reset_session():
     session.tasks.clear()
     session.agent = build_agent_graph()
     session.supervisor = build_supervisor_graph()
+    session.store.delete_session(session.session_id)
+    reset_snapshot_store()
     return {"status": "ok"}
 
 

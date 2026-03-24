@@ -13,3 +13,4 @@ class AgentState(TypedDict):
     file_read_tracker: dict[str, float]  # path -> mtime at last read
     injected_context: list[dict]  # [{"type": str, "source": str, "content": str}]
     working_directory: str
+    consecutive_errors: int  # track repeated failures for circuit-breaking

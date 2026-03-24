@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     max_tool_output_chars: int = 50000
     context_window_size: int = 200000
     compaction_threshold: float = 0.85
+    db_path: str = "shipyard.db"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

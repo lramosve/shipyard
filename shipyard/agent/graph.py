@@ -54,7 +54,13 @@ def list_files(directory: str = ".", pattern: str | None = None, recursive: bool
     return ""
 
 
-ALL_TOOLS = [read_file, edit_file, write_file, execute_cmd, search_files, list_files]
+@lc_tool
+def rollback_file(file_path: str, version: int = -1) -> str:
+    """Restore a file to a previous snapshot version. Use version=-1 for most recent pre-edit state."""
+    return ""
+
+
+ALL_TOOLS = [read_file, edit_file, write_file, execute_cmd, search_files, list_files, rollback_file]
 READ_ONLY_TOOLS = [read_file, search_files, list_files]
 
 

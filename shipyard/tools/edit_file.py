@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 
 from shipyard.tools.base import FileReadTracker, ToolResult
+from shipyard.tools.snapshots import FileSnapshotStore
 
 
 def edit_file(
@@ -21,6 +22,7 @@ def edit_file(
     new_string: str,
     *,
     tracker: FileReadTracker,
+    snapshot_store: FileSnapshotStore | None = None,
 ) -> ToolResult:
     """Make a surgical edit: replace old_string with new_string in file_path.
 
@@ -69,7 +71,10 @@ def edit_file(
     if count > 1:
         return _handle_multiple_matches(content, old_string, count)
 
-    # Exactly one match — perform the replacement
+    # Exactly one match — snapshot before editing
+    if snapshot_store:
+        snapshot_store.save_snapshot(str(path), content)
+
     new_content = content.replace(old_string, new_string, 1)
 
     try:
