@@ -24,7 +24,11 @@ class FileReadTracker:
 
     def record_read(self, path: str) -> None:
         normalized = os.path.normpath(os.path.abspath(path))
-        self._reads[normalized] = time.time()
+        # Use the file's own mtime to avoid clock skew between time.time() and os.path.getmtime()
+        try:
+            self._reads[normalized] = os.path.getmtime(normalized)
+        except OSError:
+            self._reads[normalized] = time.time()
 
     def was_read(self, path: str) -> bool:
         normalized = os.path.normpath(os.path.abspath(path))

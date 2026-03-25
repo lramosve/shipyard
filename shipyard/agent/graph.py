@@ -37,8 +37,8 @@ def write_file(file_path: str, content: str) -> str:
 
 
 @lc_tool
-def execute_cmd(command: str, timeout: int = 30) -> str:
-    """Execute a shell command and return its output."""
+def execute_cmd(command: str, timeout: int = 120) -> str:
+    """Execute a shell command and return its output. Use timeout=120 for installs, timeout=300 for builds."""
     return ""
 
 
@@ -60,8 +60,20 @@ def rollback_file(file_path: str, version: int = -1) -> str:
     return ""
 
 
-ALL_TOOLS = [read_file, edit_file, write_file, execute_cmd, search_files, list_files, rollback_file]
-READ_ONLY_TOOLS = [read_file, search_files, list_files]
+@lc_tool
+def web_search(query: str, max_results: int = 5) -> str:
+    """Search the web for documentation, APIs, error solutions, or best practices."""
+    return ""
+
+
+@lc_tool
+def web_fetch(url: str, extract_text: bool = True) -> str:
+    """Fetch a URL and return its contents. Set extract_text=True to strip HTML and return plain text."""
+    return ""
+
+
+ALL_TOOLS = [read_file, edit_file, write_file, execute_cmd, search_files, list_files, rollback_file, web_search, web_fetch]
+READ_ONLY_TOOLS = [read_file, search_files, list_files, web_search, web_fetch]
 
 
 def _get_model(tool_list=None, provider: str | None = None, model_name: str | None = None):

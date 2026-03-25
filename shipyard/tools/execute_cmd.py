@@ -16,7 +16,7 @@ BANNED_PATTERNS = [
 
 async def execute_cmd(
     command: str,
-    timeout: int = 30,
+    timeout: int = 120,
 ) -> ToolResult:
     """Execute a shell command and return its output.
 
