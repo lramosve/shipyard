@@ -12,3 +12,7 @@ venv/
 .mypy_cache/
 
 .vercel
+SHIP/
+app/
+test_workspace/
+demo_workspace/
