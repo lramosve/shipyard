@@ -48,6 +48,23 @@ You have full shell access. Use it for:
 - **Linting**: `ruff`, `eslint`, `cargo clippy`, etc.
 - Use timeout=120 for installs, timeout=300 for builds.
 
+## Servers & Long-Running Processes
+- For servers (uvicorn, next dev, etc.), use `background=True` — this starts the process and returns immediately.
+- Use `check_background(pid=<PID>)` to see if the process is still running or if it crashed.
+- Use `stop_background(pid=<PID>)` to stop it.
+- Example: `execute_cmd(command="uvicorn app:app --port 8080", background=True)`
+- After starting a server in the background, verify it works with a quick test (e.g., `curl http://localhost:8080/health`).
+
+## Troubleshooting
+When something fails:
+- READ the full error output carefully. The answer is almost always in the error message.
+- Check logs, stack traces, and stderr output.
+- For dependency issues: check versions, try `pip install --upgrade`, check compatibility.
+- For port conflicts: check what is using the port with `lsof -i :PORT` or `netstat -tlnp`.
+- For permission errors: check file ownership and permissions.
+- For server startup failures: start in background, then check_background to see the error.
+- Search the web for the exact error message if you can't figure it out.
+
 ## Web Research (web_search, web_fetch)
 - Use web_search to find documentation, API references, best practices, or error solutions.
 - Use web_fetch to retrieve specific URLs (docs, README files, API references).
@@ -79,7 +96,7 @@ For multi-step tasks:
 - Explain decisions briefly in responses but do not ask for approval.
 - For large tasks, break into phases and execute sequentially.
 
-Available tools: read_file, edit_file, write_file, execute_cmd, search_files, list_files, rollback_file, web_search, web_fetch."""
+Available tools: read_file, edit_file, write_file, execute_cmd, check_background, stop_background, search_files, list_files, rollback_file, web_search, web_fetch."""
 
 
 def get_snapshot_store() -> FileSnapshotStore:
@@ -132,7 +149,7 @@ def execute_tools(state: AgentState) -> dict:
     from shipyard.tools.read_file import read_file
     from shipyard.tools.edit_file import edit_file
     from shipyard.tools.write_file import write_file
-    from shipyard.tools.execute_cmd import execute_cmd
+    from shipyard.tools.execute_cmd import execute_cmd, check_background, stop_background
     from shipyard.tools.search_files import search_files
     from shipyard.tools.list_files import list_files
     from shipyard.tools.rollback_file import rollback_file
@@ -188,7 +205,26 @@ def execute_tools(state: AgentState) -> dict:
                     execute_cmd(
                         command=args["command"],
                         timeout=args.get("timeout", 120),
+                        background=args.get("background", False),
                     )
+                )
+            elif name == "check_background":
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(
+                    check_background(pid=args["pid"])
+                )
+            elif name == "stop_background":
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(
+                    stop_background(pid=args["pid"])
                 )
             elif name == "search_files":
                 result = search_files(

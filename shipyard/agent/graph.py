@@ -37,8 +37,20 @@ def write_file(file_path: str, content: str) -> str:
 
 
 @lc_tool
-def execute_cmd(command: str, timeout: int = 120) -> str:
-    """Execute a shell command and return its output. Use timeout=120 for installs, timeout=300 for builds."""
+def execute_cmd(command: str, timeout: int = 120, background: bool = False) -> str:
+    """Execute a shell command. Use background=True for servers/long-running processes. Use timeout=300 for builds."""
+    return ""
+
+
+@lc_tool
+def check_background(pid: int) -> str:
+    """Check the status and output of a background process by its PID."""
+    return ""
+
+
+@lc_tool
+def stop_background(pid: int) -> str:
+    """Stop a background process by its PID."""
     return ""
 
 
@@ -72,7 +84,7 @@ def web_fetch(url: str, extract_text: bool = True) -> str:
     return ""
 
 
-ALL_TOOLS = [read_file, edit_file, write_file, execute_cmd, search_files, list_files, rollback_file, web_search, web_fetch]
+ALL_TOOLS = [read_file, edit_file, write_file, execute_cmd, check_background, stop_background, search_files, list_files, rollback_file, web_search, web_fetch]
 READ_ONLY_TOOLS = [read_file, search_files, list_files, web_search, web_fetch]
 
 

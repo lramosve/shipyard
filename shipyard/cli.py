@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import itertools
 import os
 import sys
+import threading
+import time
 
 from langchain_core.messages import HumanMessage
 
@@ -13,6 +16,39 @@ from shipyard.agent.nodes import reset_snapshot_store
 from shipyard.config import settings
 from shipyard.context.injection import load_context_from_file
 from shipyard.tracing.setup import configure_tracing
+
+
+class Spinner:
+    """Animated thinking indicator for the CLI."""
+
+    FRAMES = ["[=   ]", "[ =  ]", "[  = ]", "[   =]", "[  = ]", "[ =  ]"]
+
+    def __init__(self, message: str = "Thinking"):
+        self._message = message
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._start_time = 0.0
+
+    def start(self):
+        self._stop.clear()
+        self._start_time = time.time()
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+        self._thread.start()
+
+    def _spin(self):
+        frames = itertools.cycle(self.FRAMES)
+        while not self._stop.is_set():
+            elapsed = int(time.time() - self._start_time)
+            frame = next(frames)
+            print(f"\r\033[33m{frame} {self._message}... ({elapsed}s)\033[0m", end="", flush=True)
+            self._stop.wait(0.2)
+        # Clear the spinner line
+        print("\r" + " " * 60 + "\r", end="", flush=True)
+
+    def stop(self):
+        self._stop.set()
+        if self._thread:
+            self._thread.join()
 
 
 def make_state(working_dir: str | None = None) -> dict:
@@ -99,9 +135,12 @@ def main():
 
         state["messages"].append(HumanMessage(content=instruction))
 
+        spinner = Spinner("Thinking")
+        spinner.start()
         try:
             graph = supervisor if use_supervisor else agent
             result = graph.invoke(state)
+            spinner.stop()
 
             # Update state
             state["messages"] = result.get("messages", state["messages"])
@@ -115,6 +154,7 @@ def main():
                     print(f"\n{content}\n")
                     break
         except Exception as e:
+            spinner.stop()
             print(f"\nError: {type(e).__name__}: {e}\n")
 
 
