@@ -1,4 +1,12 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+# Look for .env in CWD first, then in the shipyard package directory
+_env_files = [".env"]
+_package_env = Path(__file__).resolve().parent.parent / ".env"
+if _package_env.is_file():
+    _env_files.append(str(_package_env))
 
 
 class Settings(BaseSettings):
@@ -15,7 +23,7 @@ class Settings(BaseSettings):
     compaction_threshold: float = 0.85
     db_path: str = "shipyard.db"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": _env_files, "env_file_encoding": "utf-8"}
 
 
 settings = Settings()
