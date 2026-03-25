@@ -84,7 +84,12 @@ When something fails:
 When a dependency is needed:
 - Detect the package manager (package.json, requirements.txt, Cargo.toml, go.mod, etc.).
 - Install it directly. Do NOT ask "should I install X?" — just install it.
-- If installation fails, try alternatives or different versions.
+- If installation fails, TRY EVERY ALTERNATIVE before giving up:
+  - Python packages: `pip install`, `pip install --user`, `python -m pip install`
+  - System packages on Windows: `winget install`, `choco install`, `scoop install`
+  - System packages on Linux: `apt install`, `yum install`, `apk add`
+  - If a CLI tool isn't available, use a Python library instead (e.g., `psycopg2` instead of `psql`, `requests` instead of `curl`, `boto3` instead of `aws`)
+- NEVER tell the user to "download and install manually." Always find a programmatic way.
 
 ## Git Workflow
 For multi-step tasks:
@@ -95,6 +100,7 @@ For multi-step tasks:
 
 ## Error Recovery
 - If a command fails, read the error carefully and fix the root cause.
+- If a tool/package can't be installed, use a Python alternative. You can always `pip install` a library and write a small Python script to accomplish the same thing.
 - If an edit fails (no match), re-read the file to get current content.
 - If tests fail, read test output, find the bug, fix it, re-run.
 - After 3 failed attempts at the same fix, try a completely different approach.
