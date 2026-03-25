@@ -143,8 +143,20 @@ def build_system_prompt(state: AgentState) -> str:
     return "\n".join(parts)
 
 
+def _notify_tracker(method: str, **kwargs):
+    """Notify the CLI activity tracker if it's active."""
+    try:
+        from shipyard.cli import get_activity_tracker
+        tracker = get_activity_tracker()
+        if tracker:
+            getattr(tracker, method)(**kwargs)
+    except ImportError:
+        pass
+
+
 def call_llm(state: AgentState, model: Any) -> dict:
     """Call the LLM with current messages and tools. Includes compaction and retry."""
+    _notify_tracker("on_llm_start")
     system = build_system_prompt(state)
 
     messages = list(state["messages"])
@@ -195,6 +207,22 @@ def execute_tools(state: AgentState) -> dict:
         name = tool_call["name"]
         args = tool_call["args"]
         tool_call_id = tool_call["id"]
+
+        # Summarize args for display
+        args_summary = ""
+        if name in ("read_file", "edit_file", "write_file", "rollback_file"):
+            args_summary = args.get("file_path", "")
+        elif name == "execute_cmd":
+            cmd = args.get("command", "")
+            args_summary = cmd[:50] + "..." if len(cmd) > 50 else cmd
+        elif name == "search_files":
+            args_summary = args.get("pattern", "")
+        elif name == "web_search":
+            args_summary = args.get("query", "")
+        elif name == "web_fetch":
+            args_summary = args.get("url", "")[:50]
+
+        _notify_tracker("on_tool_call", tool_name=name, args_summary=args_summary)
 
         try:
             if name == "read_file":
@@ -266,6 +294,8 @@ def execute_tools(state: AgentState) -> dict:
             result = _make_error(f"Permission denied: {e}")
         except Exception as e:
             result = _make_error(f"Tool '{name}' raised an exception: {type(e).__name__}: {e}")
+
+        _notify_tracker("on_tool_done", tool_name=name, is_error=result.is_error)
 
         if result.is_error:
             error_count += 1

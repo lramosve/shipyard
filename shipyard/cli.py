@@ -18,37 +18,49 @@ from shipyard.context.injection import load_context_from_file
 from shipyard.tracing.setup import configure_tracing
 
 
-class Spinner:
-    """Animated thinking indicator for the CLI."""
+class ActivityTracker:
+    """Live activity display showing what the agent is doing."""
 
-    FRAMES = ["[=   ]", "[ =  ]", "[  = ]", "[   =]", "[  = ]", "[ =  ]"]
-
-    def __init__(self, message: str = "Thinking"):
-        self._message = message
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
+    def __init__(self):
         self._start_time = 0.0
+        self._turn = 0
+        self._last_status = ""
 
     def start(self):
-        self._stop.clear()
         self._start_time = time.time()
-        self._thread = threading.Thread(target=self._spin, daemon=True)
-        self._thread.start()
+        self._turn = 0
+        self._update("Starting...")
 
-    def _spin(self):
-        frames = itertools.cycle(self.FRAMES)
-        while not self._stop.is_set():
-            elapsed = int(time.time() - self._start_time)
-            frame = next(frames)
-            print(f"\r\033[33m{frame} {self._message}... ({elapsed}s)\033[0m", end="", flush=True)
-            self._stop.wait(0.2)
-        # Clear the spinner line
-        print("\r" + " " * 60 + "\r", end="", flush=True)
+    def on_llm_start(self):
+        self._turn += 1
+        self._update(f"Turn {self._turn}: calling LLM")
+
+    def on_tool_call(self, tool_name: str, args_summary: str = ""):
+        detail = f": {args_summary}" if args_summary else ""
+        self._update(f"Turn {self._turn}: {tool_name}{detail}")
+
+    def on_tool_done(self, tool_name: str, is_error: bool = False):
+        status = "ERROR" if is_error else "done"
+        self._update(f"Turn {self._turn}: {tool_name} -> {status}")
+
+    def _update(self, status: str):
+        elapsed = int(time.time() - self._start_time)
+        self._last_status = status
+        # Truncate long status to fit terminal
+        display = status[:70] if len(status) > 70 else status
+        print(f"\r\033[33m  [{elapsed:>4}s] {display}\033[0m" + " " * 10, end="", flush=True)
 
     def stop(self):
-        self._stop.set()
-        if self._thread:
-            self._thread.join()
+        elapsed = int(time.time() - self._start_time)
+        print(f"\r\033[32m  [{elapsed:>4}s] Done ({self._turn} turns)\033[0m" + " " * 20)
+
+
+# Global tracker accessible from nodes
+_activity_tracker: ActivityTracker | None = None
+
+
+def get_activity_tracker() -> ActivityTracker | None:
+    return _activity_tracker
 
 
 def make_state(working_dir: str | None = None) -> dict:
@@ -135,12 +147,15 @@ def main():
 
         state["messages"].append(HumanMessage(content=instruction))
 
-        spinner = Spinner("Thinking")
-        spinner.start()
+        global _activity_tracker
+        tracker = ActivityTracker()
+        _activity_tracker = tracker
+        tracker.start()
         try:
             graph = supervisor if use_supervisor else agent
             result = graph.invoke(state)
-            spinner.stop()
+            tracker.stop()
+            _activity_tracker = None
 
             # Update state
             state["messages"] = result.get("messages", state["messages"])
@@ -154,7 +169,8 @@ def main():
                     print(f"\n{content}\n")
                     break
         except Exception as e:
-            spinner.stop()
+            tracker.stop()
+            _activity_tracker = None
             print(f"\nError: {type(e).__name__}: {e}\n")
 
 
