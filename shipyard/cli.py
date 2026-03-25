@@ -19,38 +19,50 @@ from shipyard.tracing.setup import configure_tracing
 
 
 class ActivityTracker:
-    """Live activity display showing what the agent is doing."""
+    """Live activity display with continuously updating timer."""
 
     def __init__(self):
         self._start_time = 0.0
         self._turn = 0
         self._last_status = ""
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
 
     def start(self):
         self._start_time = time.time()
         self._turn = 0
-        self._update("Starting...")
+        self._last_status = "Starting..."
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._tick, daemon=True)
+        self._thread.start()
+
+    def _tick(self):
+        """Background thread that refreshes the display every second."""
+        while not self._stop_event.is_set():
+            self._render()
+            self._stop_event.wait(1.0)
+
+    def _render(self):
+        elapsed = int(time.time() - self._start_time)
+        display = self._last_status[:70]
+        print(f"\r\033[33m  [{elapsed:>4}s] {display}\033[0m" + " " * 10, end="", flush=True)
 
     def on_llm_start(self):
         self._turn += 1
-        self._update(f"Turn {self._turn}: calling LLM")
+        self._last_status = f"Turn {self._turn}: calling LLM"
 
     def on_tool_call(self, tool_name: str, args_summary: str = ""):
         detail = f": {args_summary}" if args_summary else ""
-        self._update(f"Turn {self._turn}: {tool_name}{detail}")
+        self._last_status = f"Turn {self._turn}: {tool_name}{detail}"
 
     def on_tool_done(self, tool_name: str, is_error: bool = False):
         status = "ERROR" if is_error else "done"
-        self._update(f"Turn {self._turn}: {tool_name} -> {status}")
-
-    def _update(self, status: str):
-        elapsed = int(time.time() - self._start_time)
-        self._last_status = status
-        # Truncate long status to fit terminal
-        display = status[:70] if len(status) > 70 else status
-        print(f"\r\033[33m  [{elapsed:>4}s] {display}\033[0m" + " " * 10, end="", flush=True)
+        self._last_status = f"Turn {self._turn}: {tool_name} -> {status}"
 
     def stop(self):
+        self._stop_event.set()
+        if self._thread:
+            self._thread.join()
         elapsed = int(time.time() - self._start_time)
         print(f"\r\033[32m  [{elapsed:>4}s] Done ({self._turn} turns)\033[0m" + " " * 20)
 
