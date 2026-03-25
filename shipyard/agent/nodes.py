@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
@@ -205,36 +204,15 @@ def execute_tools(state: AgentState) -> dict:
                     snapshot_store=snapshot_store,
                 )
             elif name == "execute_cmd":
-                try:
-                    loop = asyncio.get_event_loop()
-                except RuntimeError:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                result = loop.run_until_complete(
-                    execute_cmd(
-                        command=args["command"],
-                        timeout=args.get("timeout", 120),
-                        background=args.get("background", False),
-                    )
+                result = execute_cmd(
+                    command=args["command"],
+                    timeout=args.get("timeout", 120),
+                    background=args.get("background", False),
                 )
             elif name == "check_background":
-                try:
-                    loop = asyncio.get_event_loop()
-                except RuntimeError:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                result = loop.run_until_complete(
-                    check_background(pid=args["pid"])
-                )
+                result = check_background(pid=args["pid"])
             elif name == "stop_background":
-                try:
-                    loop = asyncio.get_event_loop()
-                except RuntimeError:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                result = loop.run_until_complete(
-                    stop_background(pid=args["pid"])
-                )
+                result = stop_background(pid=args["pid"])
             elif name == "search_files":
                 result = search_files(
                     pattern=args["pattern"],

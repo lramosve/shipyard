@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
-import signal
-import sys
+import subprocess
+import threading
+import time
 
 from shipyard.config import settings
 from shipyard.tools.base import ToolResult
@@ -16,10 +16,10 @@ BANNED_PATTERNS = [
 ]
 
 # Track background processes for status checking and cleanup
-_background_processes: dict[int, dict] = {}  # pid -> {"proc", "command", "output"}
+_background_processes: dict[int, dict] = {}  # pid -> {"proc", "command"}
 
 
-async def execute_cmd(
+def execute_cmd(
     command: str,
     timeout: int = 120,
     background: bool = False,
@@ -32,78 +32,35 @@ async def execute_cmd(
         background: If True, start the process in the background and return immediately
                     with the PID. Use check_background to see its output later.
     """
-    # Safety check
     for banned in BANNED_PATTERNS:
         if banned in command:
             return ToolResult(output=f"Error: Command blocked for safety: contains '{banned}'", is_error=True)
 
-    try:
-        proc = await asyncio.create_subprocess_shell(
-            command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-    except Exception as e:
-        return ToolResult(output=f"Error starting command: {e}", is_error=True)
-
     if background:
-        # Store the process and return immediately
-        _background_processes[proc.pid] = {
-            "proc": proc,
-            "command": command,
-            "stdout_parts": [],
-            "stderr_parts": [],
-        }
+        return _run_background(command)
 
-        # Wait a few seconds to capture initial output (startup errors, etc.)
-        try:
-            await asyncio.wait_for(proc.wait(), timeout=3)
-            # Process exited quickly — likely an error
-            stdout, stderr = await proc.communicate()
-            exit_code = proc.returncode
-            del _background_processes[proc.pid]
+    return _run_foreground(command, timeout)
 
-            output = ""
-            if stdout:
-                output += stdout.decode("utf-8", errors="replace")
-            if stderr:
-                output += f"\nSTDERR:\n{stderr.decode('utf-8', errors='replace')}"
 
-            return ToolResult(
-                output=f"Process exited immediately (exit code {exit_code}). "
-                f"This was NOT started in the background.\n{output}",
-                is_error=exit_code != 0,
-            )
-        except asyncio.TimeoutError:
-            # Good — process is still running
-            pass
-
-        return ToolResult(
-            output=f"Started background process (PID {proc.pid}): {command}\n"
-            f"Use check_background(pid={proc.pid}) to check its status.\n"
-            f"Use stop_background(pid={proc.pid}) to stop it."
-        )
-
-    # Normal (foreground) execution
+def _run_foreground(command: str, timeout: int) -> ToolResult:
+    """Run a command and wait for completion."""
     try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except asyncio.TimeoutError:
-        proc.kill()
-        # Capture whatever output we got before timeout
-        try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=5)
-        except Exception:
-            stdout, stderr = b"", b""
-
-        partial_output = ""
-        if stdout:
-            partial_output += stdout.decode("utf-8", errors="replace")
-        if stderr:
-            partial_output += f"\nSTDERR:\n{stderr.decode('utf-8', errors='replace')}"
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as e:
+        partial = ""
+        if e.stdout:
+            partial += e.stdout.decode("utf-8", errors="replace")
+        if e.stderr:
+            partial += f"\nSTDERR:\n{e.stderr.decode('utf-8', errors='replace')}"
 
         return ToolResult(
             output=f"Command timed out after {timeout}s: {command}\n\n"
-            f"Partial output before timeout:\n{partial_output}\n\n"
+            f"Partial output before timeout:\n{partial}\n\n"
             f"HINT: If this is a server or long-running process, use background=True to start it "
             f"in the background. Example: execute_cmd(command='uvicorn app:app', background=True)",
             is_error=True,
@@ -112,25 +69,63 @@ async def execute_cmd(
         return ToolResult(output=f"Error executing command: {e}", is_error=True)
 
     output_parts: list[str] = []
-    if stdout:
-        output_parts.append(stdout.decode("utf-8", errors="replace"))
-    if stderr:
-        output_parts.append(f"STDERR:\n{stderr.decode('utf-8', errors='replace')}")
+    if result.stdout:
+        output_parts.append(result.stdout.decode("utf-8", errors="replace"))
+    if result.stderr:
+        output_parts.append(f"STDERR:\n{result.stderr.decode('utf-8', errors='replace')}")
 
     output = "\n".join(output_parts) if output_parts else "(no output)"
-    exit_code = proc.returncode
+    text = f"Exit code: {result.returncode}\n{output}"
 
-    result = f"Exit code: {exit_code}\n{output}"
-
-    # Truncate
-    if len(result) > settings.max_tool_output_chars:
+    if len(text) > settings.max_tool_output_chars:
         half = settings.max_tool_output_chars // 2
-        result = result[:half] + "\n\n... (output truncated) ...\n\n" + result[-half:]
+        text = text[:half] + "\n\n... (output truncated) ...\n\n" + text[-half:]
 
-    return ToolResult(output=result, is_error=exit_code != 0)
+    return ToolResult(output=text, is_error=result.returncode != 0)
 
 
-async def check_background(pid: int) -> ToolResult:
+def _run_background(command: str) -> ToolResult:
+    """Start a process in the background and return immediately."""
+    try:
+        proc = subprocess.Popen(
+            command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except Exception as e:
+        return ToolResult(output=f"Error starting command: {e}", is_error=True)
+
+    _background_processes[proc.pid] = {"proc": proc, "command": command}
+
+    # Wait a few seconds to catch immediate startup errors
+    time.sleep(3)
+
+    if proc.poll() is not None:
+        # Process exited quickly — likely an error
+        stdout, stderr = proc.communicate()
+        del _background_processes[proc.pid]
+
+        output = ""
+        if stdout:
+            output += stdout.decode("utf-8", errors="replace")
+        if stderr:
+            output += f"\nSTDERR:\n{stderr.decode('utf-8', errors='replace')}"
+
+        return ToolResult(
+            output=f"Process exited immediately (exit code {proc.returncode}). "
+            f"This was NOT started in the background.\n{output}",
+            is_error=proc.returncode != 0,
+        )
+
+    return ToolResult(
+        output=f"Started background process (PID {proc.pid}): {command}\n"
+        f"Use check_background(pid={proc.pid}) to check its status.\n"
+        f"Use stop_background(pid={proc.pid}) to stop it."
+    )
+
+
+def check_background(pid: int) -> ToolResult:
     """Check the status and output of a background process.
 
     Args:
@@ -146,13 +141,9 @@ async def check_background(pid: int) -> ToolResult:
 
     proc = entry["proc"]
 
-    if proc.returncode is not None:
-        # Process has exited
-        stdout, stderr = b"", b""
-        try:
-            stdout, stderr = await proc.communicate()
-        except Exception:
-            pass
+    if proc.poll() is not None:
+        stdout, stderr = proc.communicate()
+        del _background_processes[pid]
 
         output = ""
         if stdout:
@@ -160,14 +151,12 @@ async def check_background(pid: int) -> ToolResult:
         if stderr:
             output += f"\nSTDERR:\n{stderr.decode('utf-8', errors='replace')}"
 
-        del _background_processes[pid]
         return ToolResult(
             output=f"Process {pid} has exited (exit code {proc.returncode}).\n"
             f"Command: {entry['command']}\n{output}",
             is_error=proc.returncode != 0,
         )
 
-    # Still running
     return ToolResult(
         output=f"Process {pid} is still running.\n"
         f"Command: {entry['command']}\n"
@@ -175,7 +164,7 @@ async def check_background(pid: int) -> ToolResult:
     )
 
 
-async def stop_background(pid: int) -> ToolResult:
+def stop_background(pid: int) -> ToolResult:
     """Stop a background process.
 
     Args:
@@ -192,8 +181,8 @@ async def stop_background(pid: int) -> ToolResult:
     try:
         proc.terminate()
         try:
-            await asyncio.wait_for(proc.wait(), timeout=5)
-        except asyncio.TimeoutError:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
             proc.kill()
     except Exception as e:
         return ToolResult(output=f"Error stopping process: {e}", is_error=True)
