@@ -79,11 +79,43 @@ def compact_messages(messages: list[BaseMessage], model: Any) -> list[BaseMessag
         logger.warning(f"Compaction failed, keeping original messages: {e}")
         return messages
 
+    # Sanitize recent messages: ensure they don't start with orphaned ToolMessages
+    # Find the first HumanMessage or AIMessage (without orphaned tool context)
+    sanitized = _sanitize_recent_messages(recent_messages)
+
     # Build new message list
     result = []
     if system_msg:
         result.append(system_msg)
     result.append(SystemMessage(content=f"[Conversation Summary]\n{summary_text}"))
-    result.extend(recent_messages)
+    result.extend(sanitized)
 
     return result
+
+
+def _sanitize_recent_messages(messages: list[BaseMessage]) -> list[BaseMessage]:
+    """Remove orphaned ToolMessages from the start of the recent window.
+
+    ToolMessages must follow an AIMessage with matching tool_calls.
+    After compaction, the AIMessage might have been summarized away.
+    """
+    from langchain_core.messages import AIMessage, ToolMessage
+
+    # Find the first safe starting point
+    start = 0
+    for i, msg in enumerate(messages):
+        if isinstance(msg, ToolMessage):
+            # Check if there's a preceding AIMessage with tool_calls
+            has_parent = False
+            for j in range(i - 1, -1, -1):
+                if isinstance(messages[j], AIMessage) and messages[j].tool_calls:
+                    has_parent = True
+                    break
+                if isinstance(messages[j], (HumanMessage, SystemMessage)):
+                    break
+            if not has_parent:
+                start = i + 1
+        else:
+            break
+
+    return messages[start:]
