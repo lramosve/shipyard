@@ -251,10 +251,6 @@ def call_llm(state: AgentState, model: Any) -> dict:
 
 # Patterns that indicate the agent is being passive instead of acting
 _BANNED_PATTERN_STRINGS = [
-    "### suggested", "### next steps", "### steps to", "### steps for",
-    "### troubleshooting", "### further troubleshooting",
-    "### actions to", "### installation guide", "### diagnostic steps",
-    "### checking", "### reviewing", "### resolution", "### recommendation",
     "let me know once", "let me know when", "let me know if",
     "let me know so", "once done, please", "once done, let",
     "please confirm", "please provide", "please verify", "please ensure",
@@ -278,6 +274,12 @@ _BANNED_PATTERN_STRINGS = [
 def _has_banned_patterns(text: str) -> bool:
     """Check if text contains patterns indicating passive/suggestion behavior."""
     lower = text.lower()
+
+    # Any "### " heading followed by a numbered list is almost always passive advice
+    import re
+    if re.search(r'###\s+\w', lower) and re.search(r'\n\d+\.\s+\*\*', lower):
+        return True
+
     matches = sum(1 for p in _BANNED_PATTERN_STRINGS if p in lower)
     # Trigger if 2+ banned patterns found (single occurrence might be okay in context)
     return matches >= 2
@@ -422,18 +424,26 @@ def execute_tools(state: AgentState) -> dict:
     }
 
 
+MAX_TURNS = 40  # Safety limit to prevent infinite loops
+
+
 def should_continue(state: AgentState) -> str:
     """Decide whether to continue the agent loop or stop."""
     last_message = state["messages"][-1]
 
+    # Count turns (AI messages with tool calls)
+    turn_count = sum(1 for m in state["messages"] if isinstance(m, AIMessage) and m.tool_calls)
+
+    # Circuit-break on too many turns
+    if turn_count >= MAX_TURNS:
+        logger.warning(f"Turn limit: {turn_count} turns reached, stopping agent")
+        if isinstance(last_message, AIMessage) and last_message.tool_calls:
+            return "cancel_tools"
+        return "end"
+
     # Circuit-break on repeated failures
     if state.get("consecutive_errors", 0) >= 5:
         logger.warning("Circuit breaker: 5+ consecutive tool errors, stopping agent")
-        # If the last message has tool_calls, we still need to execute_tools
-        # to generate ToolMessages (otherwise the message history is invalid).
-        # The execute_tools node will handle the actual calls and the next
-        # should_continue will route to "end" since consecutive_errors resets.
-        # Instead, inject cancellation ToolMessages directly.
         if isinstance(last_message, AIMessage) and last_message.tool_calls:
             return "cancel_tools"
         return "end"
