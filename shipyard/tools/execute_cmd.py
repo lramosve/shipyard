@@ -109,31 +109,36 @@ def _run_foreground(command: str, timeout: int) -> ToolResult:
 
 
 def _run_background(command: str) -> ToolResult:
-    """Start a process in the background and return immediately."""
+    """Start a process in the background, logging output to a temp file."""
+    import tempfile
+
+    # Redirect output to temp files so we can read logs later
     try:
+        log_file = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".log", prefix="shipyard_bg_", delete=False
+        )
         proc = subprocess.Popen(
             command,
             shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,  # merge stderr into stdout log
         )
     except Exception as e:
         return ToolResult(output=f"Error starting command: {e}", is_error=True)
 
-    _background_processes[proc.pid] = {"proc": proc, "command": command}
+    _background_processes[proc.pid] = {
+        "proc": proc,
+        "command": command,
+        "log_path": log_file.name,
+    }
 
     # Wait a few seconds to catch immediate startup errors
     time.sleep(3)
 
     if proc.poll() is not None:
-        stdout, stderr = proc.communicate()
+        log_file.close()
+        output = _read_log(log_file.name)
         del _background_processes[proc.pid]
-
-        output = ""
-        if stdout:
-            output += stdout.decode("utf-8", errors="replace")
-        if stderr:
-            output += f"\nSTDERR:\n{stderr.decode('utf-8', errors='replace')}"
 
         return ToolResult(
             output=f"Process exited immediately (exit code {proc.returncode}). "
@@ -141,15 +146,21 @@ def _run_background(command: str) -> ToolResult:
             is_error=proc.returncode != 0,
         )
 
+    # Read initial output (startup messages, early errors)
+    log_file.flush()
+    initial_output = _read_log(log_file.name, tail=20)
+
     return ToolResult(
         output=f"Started background process (PID {proc.pid}): {command}\n"
-        f"Use check_background(pid={proc.pid}) to check its status.\n"
-        f"Use stop_background(pid={proc.pid}) to stop it."
+        f"Log file: {log_file.name}\n"
+        f"Use check_background(pid={proc.pid}) to see logs and status.\n"
+        f"Use stop_background(pid={proc.pid}) to stop it.\n\n"
+        f"Initial output:\n{initial_output}"
     )
 
 
 def check_background(pid: int) -> ToolResult:
-    """Check the status of a background process."""
+    """Check the status and recent logs of a background process."""
     entry = _background_processes.get(pid)
     if not entry:
         return ToolResult(
@@ -159,26 +170,22 @@ def check_background(pid: int) -> ToolResult:
         )
 
     proc = entry["proc"]
+    log_path = entry.get("log_path", "")
+    recent_logs = _read_log(log_path, tail=30) if log_path else "(no log file)"
 
     if proc.poll() is not None:
-        stdout, stderr = proc.communicate()
         del _background_processes[pid]
-
-        output = ""
-        if stdout:
-            output += stdout.decode("utf-8", errors="replace")
-        if stderr:
-            output += f"\nSTDERR:\n{stderr.decode('utf-8', errors='replace')}"
-
         return ToolResult(
-            output=f"Process {pid} has exited (exit code {proc.returncode}).\n"
-            f"Command: {entry['command']}\n{output}",
+            output=f"Process {pid} has EXITED (exit code {proc.returncode}).\n"
+            f"Command: {entry['command']}\n\n"
+            f"=== Last output ===\n{recent_logs}",
             is_error=proc.returncode != 0,
         )
 
     return ToolResult(
-        output=f"Process {pid} is still running.\n"
-        f"Command: {entry['command']}\n"
+        output=f"Process {pid} is RUNNING.\n"
+        f"Command: {entry['command']}\n\n"
+        f"=== Recent logs ===\n{recent_logs}\n\n"
         f"Use stop_background(pid={pid}) to stop it."
     )
 
@@ -217,6 +224,18 @@ def _kill_process_tree(proc: subprocess.Popen) -> None:
             proc.kill()
         except Exception:
             pass
+
+
+def _read_log(log_path: str, tail: int = 30) -> str:
+    """Read the last N lines from a log file."""
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+        if not lines:
+            return "(log file is empty)"
+        return "".join(lines[-tail:])
+    except Exception:
+        return "(could not read log file)"
 
 
 def _safe_collect_output(proc: subprocess.Popen) -> str:
