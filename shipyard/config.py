@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     llm_provider: str = "anthropic"  # "anthropic" or "openai"
     llm_model: str = "claude-sonnet-4-20250514"
     working_directory: str = "."
-    max_tool_output_chars: int = 50000
+    max_tool_output_chars: int = 20000
     context_window_size: int = 200000
-    compaction_threshold: float = 0.85
+    compaction_threshold: float = 0.50
     db_path: str = "shipyard.db"
 
     model_config = {"env_file": _env_files, "env_file_encoding": "utf-8", "extra": "ignore"}
