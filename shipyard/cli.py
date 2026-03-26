@@ -188,7 +188,16 @@ def main():
             # Print the last AI response
             for msg in reversed(result.get("messages", [])):
                 if msg.type == "ai" and msg.content:
-                    content = msg.content if isinstance(msg.content, str) else str(msg.content)
+                    content = msg.content
+                    # Handle Anthropic's list-of-blocks format
+                    if isinstance(content, list):
+                        text_parts = []
+                        for block in content:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                text_parts.append(block["text"])
+                            elif isinstance(block, str):
+                                text_parts.append(block)
+                        content = "\n".join(text_parts) if text_parts else str(msg.content)
                     print(f"\n{content}\n", flush=True)
                     break
             else:
