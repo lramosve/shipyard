@@ -50,6 +50,15 @@ def execute_cmd(
         if banned in command:
             return ToolResult(output=f"Error: Command blocked for safety: contains '{banned}'", is_error=True)
 
+    # Prevent the agent from killing its own process
+    own_pid = str(os.getpid())
+    if ("taskkill" in command.lower() or "kill " in command.lower()) and own_pid in command:
+        return ToolResult(
+            output=f"Error: Blocked — PID {own_pid} is the Shipyard agent itself. "
+            f"Do not kill your own process.",
+            is_error=True,
+        )
+
     # Auto-detect servers and force background mode
     if not background and _is_server_command(command):
         background = True

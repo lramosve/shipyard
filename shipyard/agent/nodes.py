@@ -100,6 +100,10 @@ You CAN interact with external services via execute_cmd. Use CLI tools:
 - **Databases**: `psql`, `mysql`, `sqlite3`, `redis-cli`, etc.
 Do NOT say "I can't interact with external sites." You have full shell access — use it.
 
+## Safety
+- NEVER kill your own process. If you see a Python process and aren't sure if it's you, leave it alone.
+- When killing processes to free a port, use the specific PID from `netstat -ano | findstr :PORT`, not from `tasklist | findstr python`.
+
 ## Troubleshooting
 When something fails:
 - READ the full error output carefully. The answer is almost always in the error message.
