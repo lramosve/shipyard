@@ -29,7 +29,16 @@ def _is_transient(exc: Exception) -> bool:
     return False
 
 
-def with_retry(max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 30.0):
+def _is_rate_limit(exc: Exception) -> bool:
+    name = type(exc).__name__
+    if name == "RateLimitError":
+        return True
+    if hasattr(exc, "status_code") and exc.status_code == 429:
+        return True
+    return False
+
+
+def with_retry(max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 60.0):
     """Decorator that retries on transient errors with exponential backoff."""
 
     def decorator(fn):
@@ -41,8 +50,12 @@ def with_retry(max_retries: int = 3, base_delay: float = 1.0, max_delay: float =
                 except Exception as e:
                     if attempt == max_retries or not _is_transient(e):
                         raise
-                    delay = min(base_delay * (2 ** attempt), max_delay)
-                    logger.warning(f"Retry {attempt + 1}/{max_retries} after {delay:.1f}s: {e}")
+                    # Rate limits need longer delays (per-minute window)
+                    if _is_rate_limit(e):
+                        delay = min(30 * (attempt + 1), max_delay)
+                    else:
+                        delay = min(base_delay * (2 ** attempt), max_delay)
+                    logger.warning(f"Retry {attempt + 1}/{max_retries} after {delay:.0f}s: {e}")
                     time.sleep(delay)
 
         return wrapper
