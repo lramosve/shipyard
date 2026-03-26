@@ -108,6 +108,11 @@ When something fails:
 - Use web_fetch to retrieve specific URLs (docs, README files, API references).
 - Research BEFORE coding when working with unfamiliar libraries or APIs.
 
+## Deprecated Tools — DO NOT USE
+- `create-react-app` is DEPRECATED. Use `npm create vite@latest my-app -- --template react-ts` instead.
+- `npm init react-app` is DEPRECATED. Use Vite.
+- Always use web_search to verify a tool/library is current before using it.
+
 ## Dependency Management
 When a dependency is needed:
 - Detect the package manager (package.json, requirements.txt, Cargo.toml, go.mod, etc.).

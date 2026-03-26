@@ -19,53 +19,43 @@ from shipyard.tracing.setup import configure_tracing
 
 
 class ActivityTracker:
-    """Live activity display with continuously updating timer."""
+    """Log-style activity display that prints each status on its own line."""
 
     def __init__(self):
         self._start_time = 0.0
         self._turn = 0
-        self._last_status = ""
-        self._stop_event = threading.Event()
-        self._thread: threading.Thread | None = None
+        self._last_printed = ""
 
     def start(self):
         self._start_time = time.time()
         self._turn = 0
-        self._last_status = "Starting..."
-        self._stop_event.clear()
-        self._thread = threading.Thread(target=self._tick, daemon=True)
-        self._thread.start()
+        self._last_printed = ""
 
-    def _tick(self):
-        """Background thread that refreshes the display every second."""
-        while not self._stop_event.is_set():
-            self._render()
-            self._stop_event.wait(1.0)
-
-    def _render(self):
+    def _log(self, status: str, color: str = "33"):
         elapsed = int(time.time() - self._start_time)
-        display = self._last_status[:70]
-        # \033[2K clears the entire line, \r returns to start
-        print(f"\r\033[2K\033[33m  [{elapsed:>4}s] {display}\033[0m", end="", flush=True)
+        display = status[:80]
+        # Only print if status changed (avoid flooding)
+        key = f"{self._turn}:{status}"
+        if key != self._last_printed:
+            self._last_printed = key
+            print(f"\033[{color}m  [{elapsed:>4}s] {display}\033[0m", flush=True)
 
     def on_llm_start(self):
         self._turn += 1
-        self._last_status = f"Turn {self._turn}: calling LLM"
+        self._log(f"Turn {self._turn}: calling LLM")
 
     def on_tool_call(self, tool_name: str, args_summary: str = ""):
         detail = f": {args_summary}" if args_summary else ""
-        self._last_status = f"Turn {self._turn}: {tool_name}{detail}"
+        self._log(f"Turn {self._turn}: {tool_name}{detail}")
 
     def on_tool_done(self, tool_name: str, is_error: bool = False):
+        color = "31" if is_error else "32"  # red for error, green for success
         status = "ERROR" if is_error else "done"
-        self._last_status = f"Turn {self._turn}: {tool_name} -> {status}"
+        self._log(f"Turn {self._turn}: {tool_name} -> {status}", color=color)
 
     def stop(self):
-        self._stop_event.set()
-        if self._thread:
-            self._thread.join()
         elapsed = int(time.time() - self._start_time)
-        print(f"\r\033[2K\033[32m  [{elapsed:>4}s] Done ({self._turn} turns)\033[0m")
+        print(f"\033[32m  [{elapsed:>4}s] Done ({self._turn} turns)\033[0m", flush=True)
 
 
 # Global tracker accessible from nodes
