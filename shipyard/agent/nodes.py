@@ -462,10 +462,15 @@ def should_continue(state: AgentState) -> str:
     """Decide whether to continue the agent loop or stop."""
     last_message = state["messages"][-1]
 
-    # Count turns (AI messages with tool calls)
-    turn_count = sum(1 for m in state["messages"] if isinstance(m, AIMessage) and m.tool_calls)
+    # Count turns since the last user message (current instruction only)
+    turn_count = 0
+    for m in reversed(state["messages"]):
+        if isinstance(m, HumanMessage):
+            break
+        if isinstance(m, AIMessage) and m.tool_calls:
+            turn_count += 1
 
-    # Circuit-break on too many turns
+    # Circuit-break on too many turns for this instruction
     if turn_count >= MAX_TURNS:
         logger.warning(f"Turn limit: {turn_count} turns reached, stopping agent")
         if isinstance(last_message, AIMessage) and last_message.tool_calls:
