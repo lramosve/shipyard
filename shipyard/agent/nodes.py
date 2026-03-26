@@ -203,20 +203,23 @@ def call_llm(state: AgentState, model: Any) -> dict:
     response = _invoke()
 
     # If the LLM produced a text response (no tool calls) that contains
-    # banned passive patterns, inject a correction and call again
-    if (
-        not response.tool_calls
-        and isinstance(response.content, str)
-        and _has_banned_patterns(response.content)
-    ):
-        logger.info("Response filter: caught passive response, forcing action")
+    # banned passive patterns, inject corrections and retry up to 3 times
+    for retry in range(3):
+        if (
+            response.tool_calls
+            or not isinstance(response.content, str)
+            or not _has_banned_patterns(response.content)
+        ):
+            break
+        logger.info(f"Response filter: caught passive response (attempt {retry + 1}/3), forcing action")
         messages.append(response)
         messages.append(HumanMessage(
-            content="SYSTEM OVERRIDE: Your response contained banned patterns "
-            "(suggested steps for the user, placeholder values, or requests for manual action). "
-            "You MUST take action yourself using your tools. DO NOT explain what needs to be done — "
-            "DO it. Use execute_cmd, write_file, edit_file, web_search, or any other tool. "
-            "Take the next concrete action NOW."
+            content="SYSTEM OVERRIDE: Your response was REJECTED because it told the user to do something "
+            "instead of doing it yourself. You have execute_cmd with FULL shell access. "
+            "DO NOT respond with text. Respond ONLY with a tool call. "
+            "For example: execute_cmd to check logs, check ports, install software, start services. "
+            "If you're stuck, use web_search to find the answer. "
+            "RESPOND WITH A TOOL CALL, NOT TEXT."
         ))
         response = _invoke()
 
@@ -227,14 +230,21 @@ def call_llm(state: AgentState, model: Any) -> dict:
 _BANNED_PATTERN_STRINGS = [
     "### suggested", "### next steps", "### steps to", "### troubleshooting",
     "### actions to", "### installation guide", "### diagnostic steps",
-    "let me know once", "let me know when", "let me know if you",
+    "### checking", "### reviewing", "### resolution",
+    "let me know once", "let me know when", "let me know if",
+    "let me know so", "once done, please", "once done, let",
     "please confirm", "please provide", "please verify", "please ensure",
+    "please run the following", "please let me know", "please check",
     "you'll need to", "you should", "you can ", "you may need",
     "ensure that", "make sure that", "verify that",
-    "here's how to", "here are the steps",
+    "here's how to", "here are the steps", "here's what you",
     "your_username", "your_password", "your_database",
     "once you've", "once you have", "after you",
+    "once your checks", "once this is done",
     "would you like", "if you'd like", "if you have that information",
+    "is it possible for you", "cross-verify", "at the infrastructure level",
+    "run as administrator", "elevated command prompt",
+    "align harmoniously",  # word salad indicator
 ]
 
 
