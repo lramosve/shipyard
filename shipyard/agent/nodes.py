@@ -85,10 +85,16 @@ You have full shell access. Use it for:
 - Example: `execute_cmd(command="uvicorn app:app --port 8080", background=True)`
 - After starting a server in the background, verify it works with a quick test (e.g., `curl http://localhost:8080/health`).
 
+## Docker Commands
+IMPORTANT: NEVER use `-it` flags with docker exec. They require an interactive terminal and will HANG.
+- WRONG: `docker exec -it container_name psql ...`
+- RIGHT: `docker exec container_name psql ...`
+- For database operations, prefer using Python (psycopg2, sqlalchemy) over docker exec + psql.
+
 ## External Services & APIs
 You CAN interact with external services via execute_cmd. Use CLI tools:
 - **GitHub**: `gh repo create`, `gh pr create`, `gh issue list`, etc. (GitHub CLI)
-- **Docker**: `docker build`, `docker run`, `docker push`, etc.
+- **Docker**: `docker build`, `docker run`, `docker push`, etc. (NEVER use -it flags)
 - **Cloud CLIs**: `vercel`, `railway`, `aws`, `gcloud`, `az`, `fly`, etc.
 - **HTTP requests**: `curl` for testing APIs, webhooks, health checks.
 - **Databases**: `psql`, `mysql`, `sqlite3`, `redis-cli`, etc.

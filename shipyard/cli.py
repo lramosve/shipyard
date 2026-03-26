@@ -189,8 +189,10 @@ def main():
             for msg in reversed(result.get("messages", [])):
                 if msg.type == "ai" and msg.content:
                     content = msg.content if isinstance(msg.content, str) else str(msg.content)
-                    print(f"\n{content}\n")
+                    print(f"\n{content}\n", flush=True)
                     break
+            else:
+                print("(Agent produced no response)\n", flush=True)
         except KeyboardInterrupt:
             tracker.stop()
             _activity_tracker = None
