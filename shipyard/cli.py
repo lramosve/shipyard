@@ -180,6 +180,11 @@ def main():
                     content = msg.content if isinstance(msg.content, str) else str(msg.content)
                     print(f"\n{content}\n")
                     break
+        except KeyboardInterrupt:
+            tracker.stop()
+            _activity_tracker = None
+            print("\n\nInterrupted. Returning to prompt.\n")
+            continue
         except Exception as e:
             tracker.stop()
             _activity_tracker = None
