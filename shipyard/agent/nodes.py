@@ -213,24 +213,46 @@ def call_llm(state: AgentState, model: Any) -> dict:
             break
         logger.info(f"Response filter: caught passive response (attempt {retry + 1}/3), forcing action")
         messages.append(response)
-        messages.append(HumanMessage(
-            content="SYSTEM OVERRIDE: Your response was REJECTED because it told the user to do something "
-            "instead of doing it yourself. You have execute_cmd with FULL shell access. "
-            "DO NOT respond with text. Respond ONLY with a tool call. "
-            "For example: execute_cmd to check logs, check ports, install software, start services. "
-            "If you're stuck, use web_search to find the answer. "
-            "RESPOND WITH A TOOL CALL, NOT TEXT."
-        ))
+        escalation = [
+            "SYSTEM OVERRIDE: Your response was REJECTED. DO NOT respond with text. "
+            "Call a tool NOW. Here are concrete options:\n"
+            "- execute_cmd('netstat -an | findstr 8000') to check if port is listening\n"
+            "- execute_cmd('docker ps') to check running containers\n"
+            "- execute_cmd('type app\\main.py') to check server code\n"
+            "- web_search('uvicorn connection refused localhost windows') to find solutions\n"
+            "Pick ONE and call it.",
+
+            "FINAL WARNING: You MUST call a tool. If you respond with text again, "
+            "the system will halt. Call execute_cmd, web_search, read_file, or ANY tool. "
+            "Just pick the most useful diagnostic action and DO IT.",
+
+            "LAST ATTEMPT: Call execute_cmd('netstat -an | findstr LISTEN') RIGHT NOW.",
+        ]
+        messages.append(HumanMessage(content=escalation[min(retry, 2)]))
         response = _invoke()
+
+    # If all retries exhausted and still passive, append a note
+    if (
+        not response.tool_calls
+        and isinstance(response.content, str)
+        and _has_banned_patterns(response.content)
+    ):
+        logger.warning("Response filter: all retries exhausted, agent is stuck")
+        from langchain_core.messages import AIMessage
+        response = AIMessage(
+            content="I've been unable to resolve this automatically after multiple attempts. "
+            "The core issue appears to require investigation. Let me try a different approach."
+        )
 
     return {"messages": [response]}
 
 
 # Patterns that indicate the agent is being passive instead of acting
 _BANNED_PATTERN_STRINGS = [
-    "### suggested", "### next steps", "### steps to", "### troubleshooting",
+    "### suggested", "### next steps", "### steps to", "### steps for",
+    "### troubleshooting", "### further troubleshooting",
     "### actions to", "### installation guide", "### diagnostic steps",
-    "### checking", "### reviewing", "### resolution",
+    "### checking", "### reviewing", "### resolution", "### recommendation",
     "let me know once", "let me know when", "let me know if",
     "let me know so", "once done, please", "once done, let",
     "please confirm", "please provide", "please verify", "please ensure",
