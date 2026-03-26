@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     compaction_threshold: float = 0.85
     db_path: str = "shipyard.db"
 
-    model_config = {"env_file": _env_files, "env_file_encoding": "utf-8"}
+    model_config = {"env_file": _env_files, "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()
