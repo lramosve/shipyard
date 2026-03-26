@@ -207,11 +207,28 @@ def main():
             _activity_tracker = None
             print("\n\nInterrupted. Returning to prompt.\n")
             continue
-        except Exception as e:
-            tracker.stop()
+        except BaseException as e:
+            try:
+                tracker.stop()
+            except Exception:
+                pass
             _activity_tracker = None
-            print(f"\nError: {type(e).__name__}: {e}\n")
+            # Print error prominently so it's never missed
+            import traceback
+            print(f"\n\033[31m{'=' * 60}", flush=True)
+            print(f"AGENT ERROR: {type(e).__name__}: {e}")
+            print(f"{'=' * 60}\033[0m", flush=True)
+            traceback.print_exc()
+            if isinstance(e, (SystemExit, GeneratorExit)):
+                break
+            print("Returning to prompt.\n", flush=True)
+            continue
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BaseException as e:
+        import traceback
+        print(f"\n\033[31mFATAL: {type(e).__name__}: {e}\033[0m", flush=True)
+        traceback.print_exc()
