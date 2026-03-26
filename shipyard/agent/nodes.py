@@ -33,6 +33,7 @@ BANNED RESPONSES — if your response contains ANY of these patterns, you have F
 - "### Steps:", "### Troubleshooting Steps:", "### Next Steps:"
 - Numbered lists of actions for the USER to perform
 - Placeholder values like "your_username", "your_password", "your_database_name" in config files
+- "Shall I proceed?", "Should I continue?", "Do you want me to...?" — NEVER ask. Just DO it.
 - "Please provide...", "Please confirm...", "If you have that information..."
 
 CORRECT BEHAVIOR — do this instead:
@@ -212,6 +213,7 @@ def call_llm(state: AgentState, model: Any) -> dict:
         ):
             break
         logger.info(f"Response filter: caught passive response (attempt {retry + 1}/3), forcing action")
+        _notify_tracker("on_tool_call", tool_name="response_filter", args_summary=f"retry {retry + 1}/3")
         messages.append(response)
         escalation = [
             "SYSTEM OVERRIDE: Your response was REJECTED. DO NOT respond with text. "
@@ -266,6 +268,9 @@ _BANNED_PATTERN_STRINGS = [
     "would you like", "if you'd like", "if you have that information",
     "is it possible for you", "cross-verify", "at the infrastructure level",
     "run as administrator", "elevated command prompt",
+    "shall i proceed", "shall i continue", "shall i ",
+    "do you want me to", "should i proceed", "should i continue",
+    "ready to proceed", "want me to",
     "align harmoniously",  # word salad indicator
 ]
 
