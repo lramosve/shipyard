@@ -131,6 +131,6 @@ def build_agent_graph(
         "end": END,
     })
     graph.add_edge("execute_tools", "call_llm")
-    graph.add_edge("cancel_tools", "call_llm")
+    graph.add_edge("cancel_tools", END)
 
     return graph.compile()

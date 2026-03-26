@@ -294,11 +294,11 @@ _BANNED_PATTERN_STRINGS = [
 
 def _has_banned_patterns(text: str) -> bool:
     """Check if text contains patterns indicating passive/suggestion behavior."""
+    import re
     lower = text.lower()
 
-    # Any "### " heading followed by a numbered list is almost always passive advice
-    import re
-    if re.search(r'###\s+\w', lower) and re.search(r'\n\d+\.\s+\*\*', lower):
+    # Any numbered list with bold items (1. **Foo**:) is almost always passive advice
+    if re.search(r'\n\d+\.\s+\*\*', lower):
         return True
 
     matches = sum(1 for p in _BANNED_PATTERN_STRINGS if p in lower)
