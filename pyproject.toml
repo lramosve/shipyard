@@ -21,6 +21,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "python-dotenv>=1.0",
     "ddgs>=7.0",
+    "pyreadline3>=3.4; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]

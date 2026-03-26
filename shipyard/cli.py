@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
-import itertools
 import os
 import sys
 import threading
 import time
+
+# Enable arrow keys, history, and line editing
+try:
+    import readline  # Unix
+except ImportError:
+    try:
+        import pyreadline3 as readline  # Windows
+    except ImportError:
+        pass  # No readline support — arrow keys won't work
 
 from langchain_core.messages import HumanMessage
 
