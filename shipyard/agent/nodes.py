@@ -294,6 +294,8 @@ _BANNED_PATTERN_STRINGS = [
     "shall i proceed", "shall i continue", "shall i ",
     "do you want me to", "should i proceed", "should i continue",
     "ready to proceed", "want me to",
+    "you may want to", "you might want to", "you could try",
+    "consider these", "consider the following", "deeper checks",
     "align harmoniously",  # word salad indicator
 ]
 
@@ -303,8 +305,10 @@ def _has_banned_patterns(text: str) -> bool:
     import re
     lower = text.lower()
 
-    # Any numbered list with bold items (1. **Foo**:) is almost always passive advice
-    if re.search(r'\n\d+\.\s+\*\*', lower):
+    # Any list (numbered or bulleted) with bold items is almost always passive advice
+    # Catches: "1. **Foo**:", "- **Foo**:", "* **Foo**:"
+    bold_list_items = len(re.findall(r'\n[\d\-\*]+[\.\)]*\s+\*\*', lower))
+    if bold_list_items >= 2:
         return True
 
     matches = sum(1 for p in _BANNED_PATTERN_STRINGS if p in lower)
