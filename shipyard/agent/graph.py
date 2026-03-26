@@ -95,9 +95,9 @@ def _get_model(tool_list=None, provider: str | None = None, model_name: str | No
     tools = tool_list or ALL_TOOLS
 
     if prov == "openai":
-        model = ChatOpenAI(model=name, api_key=settings.openai_api_key)
+        model = ChatOpenAI(model=name, api_key=settings.openai_api_key, timeout=120, max_retries=0)
     else:
-        model = ChatAnthropic(model=name, api_key=settings.anthropic_api_key, max_tokens=8192)
+        model = ChatAnthropic(model=name, api_key=settings.anthropic_api_key, max_tokens=8192, default_request_timeout=120, max_retries=0)
 
     return model.bind_tools(tools)
 
