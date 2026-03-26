@@ -100,6 +100,17 @@ Anything else is sent as an instruction to the agent.
 """)
 
 
+def _cleanup_background_processes():
+    """Kill any background processes started during the session."""
+    from shipyard.tools.execute_cmd import _background_processes, _kill_process_tree
+    for pid, entry in list(_background_processes.items()):
+        try:
+            _kill_process_tree(entry["proc"])
+        except Exception:
+            pass
+    _background_processes.clear()
+
+
 def main():
     configure_tracing()
 
@@ -118,6 +129,7 @@ def main():
             instruction = input("> ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nBye.")
+            _cleanup_background_processes()
             break
 
         if not instruction:
