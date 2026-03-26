@@ -45,7 +45,8 @@ class ActivityTracker:
     def _render(self):
         elapsed = int(time.time() - self._start_time)
         display = self._last_status[:70]
-        print(f"\r\033[33m  [{elapsed:>4}s] {display}\033[0m" + " " * 10, end="", flush=True)
+        # \033[2K clears the entire line, \r returns to start
+        print(f"\r\033[2K\033[33m  [{elapsed:>4}s] {display}\033[0m", end="", flush=True)
 
     def on_llm_start(self):
         self._turn += 1
@@ -64,7 +65,7 @@ class ActivityTracker:
         if self._thread:
             self._thread.join()
         elapsed = int(time.time() - self._start_time)
-        print(f"\r\033[32m  [{elapsed:>4}s] Done ({self._turn} turns)\033[0m" + " " * 20)
+        print(f"\r\033[2K\033[32m  [{elapsed:>4}s] Done ({self._turn} turns)\033[0m")
 
 
 # Global tracker accessible from nodes
