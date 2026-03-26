@@ -449,8 +449,11 @@ def execute_tools(state: AgentState) -> dict:
         )
 
     # Track consecutive errors for circuit-breaking
+    # Only accumulate if ALL tools in this batch failed; reset if any succeeded
     prev_errors = state.get("consecutive_errors", 0)
-    new_errors = prev_errors + error_count if error_count > 0 else 0
+    total_calls = len(tool_messages)
+    all_failed = error_count > 0 and error_count == total_calls
+    new_errors = prev_errors + 1 if all_failed else 0
 
     return {
         "messages": tool_messages,
