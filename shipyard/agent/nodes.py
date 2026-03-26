@@ -160,9 +160,30 @@ def reset_snapshot_store():
     _snapshot_store = FileSnapshotStore()
 
 
+def _get_os_context() -> str:
+    """Detect the OS and return platform-specific guidance."""
+    import platform
+    system = platform.system()
+    if system == "Windows":
+        return (
+            "\n\n## Environment: Windows\n"
+            "You are running on WINDOWS. Use Windows commands:\n"
+            "- Ports: `netstat -an | findstr :PORT` (NOT lsof)\n"
+            "- Processes: `tasklist`, `taskkill` (NOT ps, kill)\n"
+            "- Services: `sc query`, `net start/stop` (NOT systemctl)\n"
+            "- Paths: use backslashes or forward slashes, both work\n"
+            "- Shell: PowerShell/cmd. `ls`, `cat`, `find` work via Git Bash.\n"
+            "- DO NOT use: lsof, grep (use findstr), killall, systemctl, apt\n"
+        )
+    elif system == "Darwin":
+        return "\n\n## Environment: macOS\n"
+    else:
+        return f"\n\n## Environment: {system}\n"
+
+
 def build_system_prompt(state: AgentState) -> str:
     """Build the system prompt including any injected context."""
-    parts = [SYSTEM_PROMPT]
+    parts = [SYSTEM_PROMPT, _get_os_context()]
     injected = format_injected_context(state.get("injected_context", []))
     if injected:
         parts.append("\n\n# Injected Context\n\n" + injected)
