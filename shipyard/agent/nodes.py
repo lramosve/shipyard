@@ -197,7 +197,48 @@ def call_llm(state: AgentState, model: Any) -> dict:
 
     response = _invoke()
 
+    # If the LLM produced a text response (no tool calls) that contains
+    # banned passive patterns, inject a correction and call again
+    if (
+        not response.tool_calls
+        and isinstance(response.content, str)
+        and _has_banned_patterns(response.content)
+    ):
+        logger.info("Response filter: caught passive response, forcing action")
+        messages.append(response)
+        messages.append(HumanMessage(
+            content="SYSTEM OVERRIDE: Your response contained banned patterns "
+            "(suggested steps for the user, placeholder values, or requests for manual action). "
+            "You MUST take action yourself using your tools. DO NOT explain what needs to be done — "
+            "DO it. Use execute_cmd, write_file, edit_file, web_search, or any other tool. "
+            "Take the next concrete action NOW."
+        ))
+        response = _invoke()
+
     return {"messages": [response]}
+
+
+# Patterns that indicate the agent is being passive instead of acting
+_BANNED_PATTERN_STRINGS = [
+    "### suggested", "### next steps", "### steps to", "### troubleshooting",
+    "### actions to", "### installation guide", "### diagnostic steps",
+    "let me know once", "let me know when", "let me know if you",
+    "please confirm", "please provide", "please verify", "please ensure",
+    "you'll need to", "you should", "you can ", "you may need",
+    "ensure that", "make sure that", "verify that",
+    "here's how to", "here are the steps",
+    "your_username", "your_password", "your_database",
+    "once you've", "once you have", "after you",
+    "would you like", "if you'd like", "if you have that information",
+]
+
+
+def _has_banned_patterns(text: str) -> bool:
+    """Check if text contains patterns indicating passive/suggestion behavior."""
+    lower = text.lower()
+    matches = sum(1 for p in _BANNED_PATTERN_STRINGS if p in lower)
+    # Trigger if 2+ banned patterns found (single occurrence might be okay in context)
+    return matches >= 2
 
 
 def execute_tools(state: AgentState) -> dict:
