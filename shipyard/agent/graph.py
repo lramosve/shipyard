@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool as lc_tool
 from langgraph.graph import END, StateGraph
 
-from shipyard.agent.nodes import call_llm, execute_tools, should_continue
+from shipyard.agent.nodes import call_llm, cancel_tools, execute_tools, should_continue
 from shipyard.agent.state import AgentState
 from shipyard.config import settings
 
@@ -121,13 +121,16 @@ def build_agent_graph(
     # Nodes
     graph.add_node("call_llm", partial(call_llm, model=model))
     graph.add_node("execute_tools", execute_tools)
+    graph.add_node("cancel_tools", cancel_tools)
 
     # Edges
     graph.set_entry_point("call_llm")
     graph.add_conditional_edges("call_llm", should_continue, {
         "execute_tools": "execute_tools",
+        "cancel_tools": "cancel_tools",
         "end": END,
     })
     graph.add_edge("execute_tools", "call_llm")
+    graph.add_edge("cancel_tools", "call_llm")
 
     return graph.compile()

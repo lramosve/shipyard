@@ -321,15 +321,42 @@ def execute_tools(state: AgentState) -> dict:
 
 def should_continue(state: AgentState) -> str:
     """Decide whether to continue the agent loop or stop."""
+    last_message = state["messages"][-1]
+
     # Circuit-break on repeated failures
     if state.get("consecutive_errors", 0) >= 5:
         logger.warning("Circuit breaker: 5+ consecutive tool errors, stopping agent")
+        # If the last message has tool_calls, we still need to execute_tools
+        # to generate ToolMessages (otherwise the message history is invalid).
+        # The execute_tools node will handle the actual calls and the next
+        # should_continue will route to "end" since consecutive_errors resets.
+        # Instead, inject cancellation ToolMessages directly.
+        if isinstance(last_message, AIMessage) and last_message.tool_calls:
+            return "cancel_tools"
         return "end"
 
-    last_message = state["messages"][-1]
     if isinstance(last_message, AIMessage) and last_message.tool_calls:
         return "execute_tools"
     return "end"
+
+
+def cancel_tools(state: AgentState) -> dict:
+    """Inject cancellation ToolMessages for pending tool calls when circuit breaker fires."""
+    last_message = state["messages"][-1]
+    if not isinstance(last_message, AIMessage) or not last_message.tool_calls:
+        return {"messages": [], "consecutive_errors": 0}
+
+    tool_messages = []
+    for tool_call in last_message.tool_calls:
+        tool_messages.append(
+            ToolMessage(
+                content="Cancelled: agent stopped after 5+ consecutive errors. Try a different approach.",
+                tool_call_id=tool_call["id"],
+                status="error",
+            )
+        )
+
+    return {"messages": tool_messages, "consecutive_errors": 0}
 
 
 def _make_error(msg: str):
