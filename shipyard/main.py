@@ -118,6 +118,10 @@ async def process_instruction(task_id: str, request: InstructionRequest):
                 "injected_context": list(session.injected_context),
                 "working_directory": settings.working_directory,
                 "consecutive_errors": 0,
+                "architecture_plan": "",
+                "current_phase": "architect",
+                "review_issues": [],
+                "iteration_count": 0,
             }
 
             # Run the appropriate graph

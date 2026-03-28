@@ -7,14 +7,8 @@ import sys
 import threading
 import time
 
-# Enable arrow keys, history, and line editing
-try:
-    import readline  # Unix
-except ImportError:
-    try:
-        import pyreadline3 as readline  # Windows
-    except ImportError:
-        pass  # No readline support — arrow keys won't work
+from prompt_toolkit import PromptSession
+from prompt_toolkit.history import InMemoryHistory
 
 from langchain_core.messages import HumanMessage
 
@@ -81,6 +75,10 @@ def make_state(working_dir: str | None = None) -> dict:
         "injected_context": [],
         "working_directory": working_dir or os.path.abspath(settings.working_directory),
         "consecutive_errors": 0,
+        "architecture_plan": "",
+        "current_phase": "architect",
+        "review_issues": [],
+        "iteration_count": 0,
     }
 
 
@@ -117,6 +115,7 @@ def main():
     agent = build_agent_graph()
     supervisor = build_supervisor_graph()
     state = make_state(working_dir)
+    session = PromptSession(history=InMemoryHistory())
 
     print(f"Shipyard CLI — model: {settings.llm_model} ({settings.llm_provider})")
     print(f"Working directory: {working_dir}")
@@ -124,7 +123,7 @@ def main():
 
     while True:
         try:
-            instruction = input("> ").strip()
+            instruction = session.prompt("> ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nBye.")
             _cleanup_background_processes()
@@ -184,6 +183,10 @@ def main():
             state["messages"] = result.get("messages", state["messages"])
             state["file_read_tracker"] = result.get("file_read_tracker", state["file_read_tracker"])
             state["consecutive_errors"] = result.get("consecutive_errors", 0)
+            state["architecture_plan"] = result.get("architecture_plan", state.get("architecture_plan", ""))
+            state["current_phase"] = result.get("current_phase", "architect")
+            state["review_issues"] = result.get("review_issues", [])
+            state["iteration_count"] = result.get("iteration_count", 0)
 
             # Print the last AI response
             for msg in reversed(result.get("messages", [])):

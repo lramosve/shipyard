@@ -87,6 +87,13 @@ def web_fetch(url: str, extract_text: bool = True) -> str:
 ALL_TOOLS = [read_file, edit_file, write_file, execute_cmd, check_background, stop_background, search_files, list_files, rollback_file, web_search, web_fetch]
 READ_ONLY_TOOLS = [read_file, search_files, list_files, web_search, web_fetch]
 
+WORKER_TOOLS = {
+    "architect": READ_ONLY_TOOLS,
+    "coder": ALL_TOOLS,
+    "tester": ALL_TOOLS,
+    "reviewer": READ_ONLY_TOOLS,
+}
+
 
 def _get_model(tool_list=None, provider: str | None = None, model_name: str | None = None):
     """Create the LLM model with tools bound."""
