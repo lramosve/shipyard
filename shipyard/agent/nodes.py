@@ -150,9 +150,35 @@ For multi-step tasks:
 - After 3 failed attempts at the same fix, try a completely different approach.
 - Never repeat the exact same action that just failed.
 
+## Architectural Fidelity
+When rebuilding or extending an existing application:
+- PRESERVE the original's programming language and framework. NEVER swap languages (e.g., TypeScript to Python) unless explicitly instructed.
+- PRESERVE the original's data model patterns. If the original uses a unified document model, polymorphic tables, or JSONB columns, reproduce that pattern — do NOT normalize into conventional separate tables.
+- PRESERVE the original's file organization. If the original has 45 components across 20+ files, do NOT collapse into a single file.
+- REPRODUCE all security measures: authentication, password hashing (bcrypt/argon2, NEVER SHA-256 or md5), CSRF, rate limiting, input validation, audit logging.
+- REPRODUCE all accessibility patterns: ARIA attributes, semantic HTML, keyboard navigation, screen reader support.
+- When an Architecture Plan is present in your context, treat it as your specification. Follow it section by section. Deviations require explicit justification.
+- Study the original BEFORE writing any new code. Read its directory structure, config files, schema, and key source files first.
+
+## File Organization
+- No single source file should exceed 300 lines. If a file would exceed this limit, split it into logical sub-modules immediately.
+- Frontend: one component per file. Shared hooks in a hooks/ directory. Context providers in a contexts/ directory. Pages in a pages/ directory.
+- Backend: one resource/router per file. Middleware in a middleware/ directory. Models/schemas in a models/ or schemas/ directory.
+- Shared types: one schema file per domain concept. Index files for re-exports only.
+- NEVER put all frontend code in a single file. NEVER put all API routes in a single file. NEVER put all types in a single file.
+- When creating a new project, establish the directory structure FIRST before writing any implementation code.
+
+## Non-Functional Requirements
+Apply these to ALL projects unless the Architecture Plan specifies otherwise:
+- Security: Add security middleware (helmet/CORS/rate-limiting). Hash passwords with bcrypt (cost 12+) or argon2. Validate all inputs with Zod or equivalent. Never log secrets. Add CSRF protection for session-based auth.
+- Accessibility: Use semantic HTML elements (nav, main, article, section, header, footer). Add ARIA labels to all interactive elements. Ensure keyboard navigability (tabindex, onKeyDown handlers). Use sufficient color contrast (WCAG 2.1 AA).
+- Error handling: Use error boundaries (React) or global error middleware (Express/FastAPI). Return structured error responses with codes and messages. Never expose stack traces in production.
+- Testing: Write tests for key business logic, API endpoints, and database operations. Test error paths, not just happy paths. Aim for at least one test per API endpoint.
+
 ## Autonomy
-- Make architectural decisions yourself. Choose frameworks, file structure, naming conventions.
-- When multiple approaches exist, pick the most standard one and proceed.
+- When an Architecture Plan exists, follow it — do not make independent architectural decisions that contradict the plan.
+- When no plan exists, make architectural decisions yourself. Choose frameworks, file structure, naming conventions.
+- When multiple approaches exist, pick the one that most closely matches the original codebase (if rebuilding) or the most standard one (if building new).
 - Explain decisions briefly in responses but do not ask for approval.
 - For large tasks, break into phases and execute sequentially.
 

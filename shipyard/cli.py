@@ -76,9 +76,11 @@ def make_state(working_dir: str | None = None) -> dict:
         "working_directory": working_dir or os.path.abspath(settings.working_directory),
         "consecutive_errors": 0,
         "architecture_plan": "",
+        "architecture_plan_json": "",
         "current_phase": "architect",
         "review_issues": [],
         "iteration_count": 0,
+        "previous_issues": [],
     }
 
 
@@ -184,9 +186,11 @@ def main():
             state["file_read_tracker"] = result.get("file_read_tracker", state["file_read_tracker"])
             state["consecutive_errors"] = result.get("consecutive_errors", 0)
             state["architecture_plan"] = result.get("architecture_plan", state.get("architecture_plan", ""))
+            state["architecture_plan_json"] = result.get("architecture_plan_json", state.get("architecture_plan_json", ""))
             state["current_phase"] = result.get("current_phase", "architect")
             state["review_issues"] = result.get("review_issues", [])
             state["iteration_count"] = result.get("iteration_count", 0)
+            state["previous_issues"] = result.get("previous_issues", [])
 
             # Print the last AI response
             for msg in reversed(result.get("messages", [])):

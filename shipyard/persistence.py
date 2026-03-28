@@ -47,6 +47,13 @@ class SessionStore:
                 PRIMARY KEY (session_id, file_path),
                 FOREIGN KEY (session_id) REFERENCES sessions(id)
             );
+            CREATE TABLE IF NOT EXISTS architecture_plans (
+                session_id TEXT PRIMARY KEY,
+                plan_text TEXT NOT NULL DEFAULT '',
+                plan_json TEXT NOT NULL DEFAULT '',
+                created_at REAL,
+                FOREIGN KEY (session_id) REFERENCES sessions(id)
+            );
         """)
         self._conn.commit()
 
@@ -110,9 +117,28 @@ class SessionStore:
         ).fetchall()
         return {row["file_path"]: row["read_time"] for row in rows}
 
+    def save_plan(self, session_id: str, plan_text: str, plan_json: str) -> None:
+        """Persist the architecture plan for a session."""
+        self._conn.execute(
+            "INSERT OR REPLACE INTO architecture_plans (session_id, plan_text, plan_json, created_at) VALUES (?, ?, ?, ?)",
+            (session_id, plan_text, plan_json, time.time()),
+        )
+        self._conn.commit()
+
+    def load_plan(self, session_id: str) -> tuple[str, str]:
+        """Load the architecture plan for a session. Returns (plan_text, plan_json)."""
+        row = self._conn.execute(
+            "SELECT plan_text, plan_json FROM architecture_plans WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        if row:
+            return (row["plan_text"] or "", row["plan_json"] or "")
+        return ("", "")
+
     def delete_session(self, session_id: str) -> None:
         self._conn.execute("DELETE FROM session_messages WHERE session_id = ?", (session_id,))
         self._conn.execute("DELETE FROM file_read_tracker WHERE session_id = ?", (session_id,))
+        self._conn.execute("DELETE FROM architecture_plans WHERE session_id = ?", (session_id,))
         self._conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
         self._conn.commit()
 

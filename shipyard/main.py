@@ -66,6 +66,8 @@ class SessionState:
         self.file_read_tracker: dict[str, float] = {}
         self.injected_context: list[dict] = []
         self.messages: list = []
+        self.architecture_plan: str = ""
+        self.architecture_plan_json: str = ""
         self.tasks: dict[str, TaskResponse] = {}
         self.agent = build_agent_graph()
         self.supervisor = build_supervisor_graph()
@@ -81,6 +83,10 @@ class SessionState:
             self.messages = msgs
             self.file_read_tracker = self.store.load_file_tracker(self.session_id)
             self.injected_context = self.store.load_context(self.session_id)
+        plan_text, plan_json = self.store.load_plan(self.session_id)
+        if plan_text:
+            self.architecture_plan = plan_text
+            self.architecture_plan_json = plan_json
 
     def persist(self):
         """Save current state to SQLite."""
@@ -88,6 +94,8 @@ class SessionState:
         self.store.save_messages(self.session_id, self.messages)
         self.store.save_file_tracker(self.session_id, self.file_read_tracker)
         self.store.save_context(self.session_id, self.injected_context)
+        if self.architecture_plan:
+            self.store.save_plan(self.session_id, self.architecture_plan, self.architecture_plan_json)
 
 
 session = SessionState()
@@ -118,10 +126,12 @@ async def process_instruction(task_id: str, request: InstructionRequest):
                 "injected_context": list(session.injected_context),
                 "working_directory": settings.working_directory,
                 "consecutive_errors": 0,
-                "architecture_plan": "",
+                "architecture_plan": session.architecture_plan,
+                "architecture_plan_json": session.architecture_plan_json,
                 "current_phase": "architect",
                 "review_issues": [],
                 "iteration_count": 0,
+                "previous_issues": [],
             }
 
             # Run the appropriate graph
@@ -133,6 +143,11 @@ async def process_instruction(task_id: str, request: InstructionRequest):
             # Update session state with results
             session.messages = result.get("messages", session.messages)
             session.file_read_tracker = result.get("file_read_tracker", session.file_read_tracker)
+            # Preserve architecture plan from supervisor runs
+            if result.get("architecture_plan"):
+                session.architecture_plan = result["architecture_plan"]
+            if result.get("architecture_plan_json"):
+                session.architecture_plan_json = result["architecture_plan_json"]
 
             # Extract final response
             final_text = ""
