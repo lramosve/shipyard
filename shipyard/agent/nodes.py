@@ -7,7 +7,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from shipyard.agent.compaction import compact_messages, needs_compaction
+from shipyard.agent.compaction import compact_messages, enforce_hard_ceiling, needs_compaction
 from shipyard.agent.state import AgentState
 from shipyard.config import settings
 from shipyard.context.injection import format_injected_context
@@ -252,6 +252,9 @@ def call_llm(state: AgentState, model: Any) -> dict:
     if needs_compaction(messages):
         messages = compact_messages(messages, model)
         logger.info("Context compacted before LLM call")
+
+    # Hard ceiling: last line of defense — truncate if still over budget
+    messages = enforce_hard_ceiling(messages)
 
     # Retry on transient API failures
     @with_retry(max_retries=3, base_delay=2.0)

@@ -85,7 +85,7 @@ Eleven tools are available:
 
 ### LLM Provider Abstraction
 
-The LLM is accessed through a Python `Protocol` class (`LLMProvider`) that both `AnthropicProvider` and `OpenAIProvider` implement. For the LangGraph integration, `langchain-anthropic`'s `ChatAnthropic` and `langchain-openai`'s `ChatOpenAI` are used directly (native LangGraph tool binding). Changing `LLM_PROVIDER=openai` and `LLM_MODEL=gpt-4o` in `.env` switches the underlying model with no code changes. Both providers support 120s request timeout and exponential backoff retry (base 1s, rate limit 30s).
+The LLM is accessed through a Python `Protocol` class (`LLMProvider`) that both `AnthropicProvider` and `OpenAIProvider` implement. For the LangGraph integration, `langchain-anthropic`'s `ChatAnthropic` and `langchain-openai`'s `ChatOpenAI` are used directly (native LangGraph tool binding). Changing `LLM_PROVIDER=openai` and `LLM_MODEL=gpt-5.4` in `.env` switches the underlying model with no code changes. Both providers support 120s request timeout and exponential backoff retry (base 1s, rate limit 30s).
 
 ### Tracing
 

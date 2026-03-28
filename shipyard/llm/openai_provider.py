@@ -11,7 +11,7 @@ from shipyard.llm.provider import LLMResponse, TokenUsage, ToolCall
 class OpenAIProvider:
     """LLMProvider implementation backed by OpenAI GPT models."""
 
-    def __init__(self, model: str = "gpt-4o", api_key: str | None = None):
+    def __init__(self, model: str = "gpt-5.4", api_key: str | None = None):
         self._model = model
         self._client = openai.AsyncOpenAI(
             api_key=api_key or settings.openai_api_key,
@@ -73,4 +73,4 @@ class OpenAIProvider:
         return self._model
 
     def get_context_window_size(self) -> int:
-        return 128_000
+        return 922_000  # gpt-5.4 context window
